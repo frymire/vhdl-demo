@@ -32,10 +32,26 @@
 *.xrpt
 *.xml
 *.html
+*.vhi
+*.spl
+*.sym
+*.vhi
+*.cmd
+*.wdb
+*.ini
+*.log
+*.xmsgs
+.goutputstream-QBYV2Z
+*.wcfg
+*.mif
+
+*_pad.csv
+*_pad.txt
 
 _ngo
 _xmsgs
 iseconfig
+isim
 xlnx_auto_0_xdb
 xst
 webtalk.log
