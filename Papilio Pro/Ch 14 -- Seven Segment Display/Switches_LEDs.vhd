@@ -56,7 +56,6 @@ begin
 	
 	seg7_process: process(count)
 		begin
-		l
 			CASE count(15 downto 14) IS
 				WHEN "00" =>
 					Seg7_AN <= "1110";
