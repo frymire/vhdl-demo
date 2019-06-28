@@ -1,7 +1,7 @@
 
--- NOTE: The Intro to Spartan FPGA tutorial book says connecting more than 3.3 V could damage the ADC. This
--- seems to be wrong, though. The LogicStart megawing schematic shows that the analog reference voltage is 
--- 5 V. This provided sensible voltage readings using the code below.
+-- NOTE: The Intro to Spartan FPGA tutorial book says connecting more than 3.3 V could damage the ADC. The 
+-- LogicStart megawing schematic, however, shows that the analog reference voltage is 5 V. This provided 
+-- sensible voltage readings using the code below, and didn't seem to cause any damage.
 
 library IEEE;
 use IEEE.STD_LOGIC_1164.ALL;
@@ -35,19 +35,17 @@ architecture Behavioral of ADC is
 	signal dataIn: std_logic_vector(11 downto 0) := (others => '0');
 	signal channelShiftRegister: std_logic_vector(2 downto 0) := (others => '0');
 	signal dataInShiftRegister: std_logic_vector(11 downto 0) := (others => '0');
-	
-	signal seg7Counter: std_logic_vector(15 downto 0) := (others => '0');
-	signal Seg7_1000s: std_logic_vector(6 downto 0) := (others => '0');
-	signal Seg7_100s: std_logic_vector(6 downto 0) := (others => '0');
-	signal Seg7_10s: std_logic_vector(6 downto 0) := (others => '0');
-	signal Seg7_1s: std_logic_vector(6 downto 0) := (others => '0');
-	
-	COMPONENT FourBits2SevenSegments
-		PORT(
-			FourBits: in std_logic_vector(3 downto 0);          
-			SevenSegments: out std_logic_vector(6 downto 0)
+
+	component FourteenBits2Seg7By4Decimal
+		Port(
+			clock: in std_logic;
+			FourteenBits: in std_logic_vector(13 downto 0);
+			Decimals: in std_logic_vector(3 downto 0);
+			Seg7_AN: out std_logic_vector(3 downto 0);
+			Seg7: out std_logic_vector(6 downto 0);
+			Seg7_DP: out std_logic
 		);
-	END COMPONENT;	
+	end component;
 
 begin
 
@@ -61,7 +59,6 @@ begin
 	process(clock) begin
 		if rising_edge(clock) then
 		
-			seg7Counter <= seg7Counter + 1;
 			counter <= counter + 1;		
 			adc_cs_n <= not(adcActive);
 				
@@ -72,13 +69,11 @@ begin
 						
 				clockShiftRegister(0) <= counter(1);
 
-				case counter(5 downto 0) is 
-					when "000000" => 
-						dataIn <= dataInShiftRegister; -- capture reading from previous cycle
-						LEDs <= dataInShiftRegister(11 downto 4);
-						channel <= switches;
-					when others => NULL;
-				end case; 
+				if counter(5 downto 0) = "000000" then
+					dataIn <= dataInShiftRegister; -- capture reading from previous cycle
+					LEDs <= dataInShiftRegister(11 downto 4);
+					channel <= switches;
+				end if;
 
 				case counter(5 downto 2) is
 					when "0010" => channelShiftRegister(0) <= channel(2);
@@ -100,54 +95,13 @@ begin
 		
 	end process;
 	
-	
-	-- Drive the Seg7 display...
-
-	Inst_Seg7_1000s: FourBits2SevenSegments PORT MAP(
-		FourBits => '0' & channel,
-		SevenSegments => Seg7_1000s
+	Seg7Decimal: FourteenBits2Seg7By4Decimal port map (
+		clock => clock,
+		FourteenBits => "00" & dataIn,
+		Decimals => '1' & not(channel),
+		Seg7_AN => Seg7_AN,
+		Seg7 => Seg7,
+		Seg7_DP => Seg7_DP
 	);
-	
-	Inst_Seg7_100s: FourBits2SevenSegments PORT MAP(
-		FourBits => dataIn(11 downto 8),
-		SevenSegments => Seg7_100s
-	);
-
-	Inst_Seg7_10s: FourBits2SevenSegments PORT MAP(
-		FourBits => dataIn(7 downto 4),
-		SevenSegments => Seg7_10s
-	);
-	
-	Inst_Seg7_1s: FourBits2SevenSegments PORT MAP(
-		FourBits => dataIn(3 downto 0),
-		SevenSegments => Seg7_1s
-	);
-	
-	seg7_process: process(seg7Counter) begin
-	
-		CASE seg7Counter(15 downto 14) IS
-			WHEN "00" =>
-				Seg7_AN <= "1110";
-				Seg7 <= Seg7_1s;
-				Seg7_DP <= not(channel(0));
-			WHEN "01" =>
-				Seg7_AN <= "1101";
-				Seg7 <= Seg7_10s;
-				Seg7_DP <= not(channel(1));
-			WHEN "10" =>
-				Seg7_AN <= "1011";
-				Seg7 <= Seg7_100s;
-				Seg7_DP <= not(channel(2));
-			WHEN "11" =>
-				Seg7_AN <= "0111";
-				Seg7 <= Seg7_1000s;
-				Seg7_DP <= '1';
-			WHEN OTHERS =>
-				Seg7_AN <= "1111";
-				Seg7 <= "1111111";
-				Seg7_DP <= '1';
-		END CASE;
-
-	end process;
 
 end Behavioral;
