@@ -6,6 +6,7 @@
 library IEEE;
 use IEEE.STD_LOGIC_1164.ALL;
 use IEEE.STD_LOGIC_UNSIGNED.ALL;
+use IEEE.NUMERIC_STD.ALL;
 
 entity ADC is
 	Port(
@@ -32,7 +33,10 @@ architecture Behavioral of ADC is
 
 	signal adcActive: std_logic;
 	signal channel: std_logic_vector(2 downto 0) := (others => '0');
-	signal dataIn: std_logic_vector(11 downto 0) := (others => '0');
+	
+	type AnalogReadingType is array(integer range <>) of std_logic_vector(11 downto 0);
+	signal analogReading: AnalogReadingType(0 to 7) := (others => (others => '0'));
+	
 	signal channelShiftRegister: std_logic_vector(2 downto 0) := (others => '0');
 	signal dataInShiftRegister: std_logic_vector(11 downto 0) := (others => '0');
 
@@ -52,15 +56,17 @@ begin
 	adc_din <= channelShiftRegister(2);
 	adc_sclk <= clockShiftRegister(1);
 	
-	with counter(22 downto 6) select adcActive <= 
-		'1' when "00000000000000000", 
+	with counter(22 downto 9) select adcActive <= 
+		'1' when "00000000000000", 
 		'0' when others;						
 
-	process(clock) begin
+	process(clock, switches, counter, channel) begin
 		if rising_edge(clock) then
 		
 			counter <= counter + 1;		
 			adc_cs_n <= not(adcActive);
+			
+			LEDs <= analogReading(to_integer(unsigned(switches)))(11 downto 4);		
 				
 			clockShiftRegister(1) <= clockShiftRegister(0);
 			channelShiftRegister(2 downto 1) <= channelShiftRegister(1 downto 0);
@@ -70,9 +76,12 @@ begin
 				clockShiftRegister(0) <= counter(1);
 
 				if counter(5 downto 0) = "000000" then
-					dataIn <= dataInShiftRegister; -- capture reading from previous cycle
-					LEDs <= dataInShiftRegister(11 downto 4);
-					channel <= switches;
+				
+					channel <= counter(8 downto 6);
+					
+					-- capture reading from previous cycle
+					analogReading(to_integer(unsigned(channel) - 1)) <= dataInShiftRegister;
+					
 				end if;
 
 				case counter(5 downto 2) is
@@ -97,8 +106,8 @@ begin
 	
 	Seg7Decimal: FourteenBits2Seg7By4Decimal port map (
 		clock => clock,
-		FourteenBits => "00" & dataIn,
-		Decimals => '1' & not(channel),
+		FourteenBits => "00" & analogReading(to_integer(unsigned(switches))),
+		Decimals => "1" & not(switches),
 		Seg7_AN => Seg7_AN,
 		Seg7 => Seg7,
 		Seg7_DP => Seg7_DP
